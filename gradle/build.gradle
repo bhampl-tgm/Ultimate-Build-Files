@@ -1,0 +1,98 @@
+// Plugins
+apply plugin: 'java'
+apply plugin: 'application'
+apply plugin: 'jacoco'
+
+// Deploy setting
+def deployName = 'JarName'
+def mainClass = 'ac.at.tgm.test.Main'
+version = '1.0'
+
+// Run arguments
+def runVar1 = 'blabla'
+def runVar2 = 'blubblub'
+
+// Other setting
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+// Repositories
+repositories {
+    mavenCentral()
+}
+
+// Test coverage report
+jacoco {
+    toolVersion = "0.7.1.201405082137"
+    reportsDir = file("$buildDir/customJacocoReportDir")
+}
+
+jacocoTestReport {
+    reports {
+        xml.enabled false
+        csv.enabled false
+        html.destination "${buildDir}/jacocoHtml"
+    }
+}
+
+// Dependencies
+dependencies {
+    // Standard dependencies
+    compile group: 'log4j', name: 'log4j', version: '1.2.17'
+    compile group: 'args4j', name: 'args4j', version: '2.0.29'
+    testCompile group: 'junit', name: 'junit', version: '4.11'
+    testCompile group: 'org.mockito', name: 'mockito-core', version: '1.+'
+}
+
+// Run program
+task runProgram(type: JavaExec, dependsOn: ['classes']) {
+    main = mainClass
+    classpath = sourceSets.main.runtimeClasspath
+    args '-f', runVar1, '-o', runVar2, '--help'
+    standardInput = System.in
+}
+
+// Build Jar
+task buildJar(type: Jar, dependsOn: ['clean', 'javadoc', 'test']) {
+    // jar manifest
+    manifest {
+        attributes 'Implementation-Title': rootProject.name,
+                'Implementation-Version': version,
+                'Main-Class': mainClass
+    }
+    // jar base name
+    baseName = deployName
+    // pack all compile libs
+    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    // pack all source files
+    from sourceSets.main.allSource
+    // pack javadoc
+    from(javadoc.destinationDir) {
+        into('doc/javadoc')
+    }
+    // pack test coverage
+    from(jacocoTestReport.outputs.files) {
+        into('doc/testCoverage')
+    }
+    // pack test report
+    from(test.outputs.files) {
+        into('doc/testReport')
+    }
+    // pack all other files
+    from(projectDir) {
+        include 'doc/**'
+        exclude 'doc/*.docx'
+        exclude 'doc/*.odt'
+        exclude 'doc/*.tex'
+    }
+    // pack git folder
+    from('.git') {
+        into('.git')
+    }
+
+    with jar
+}
+
+// clean before compile
+compileJava.mustRunAfter clean
+
